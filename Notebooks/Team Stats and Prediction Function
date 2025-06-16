@@ -1,0 +1,142 @@
+def get_team_id(team_name):
+    import pandas as pd
+    teams = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\teams.csv")
+    team_id = teams[teams['name'] == team_name]['id'].values[0]
+    return team_id
+
+def get_team_fixtures(team_name, comp_id=None, season_id=None):
+    import pandas as pd
+    team_id = get_team_id(team_name)
+    fixtures = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixtures.csv")
+    fixtures = fixtures[(fixtures['home_team_id'] == team_id) | (fixtures['away_team_id'] == team_id)].reset_index(drop=True)
+    fixtures[['home_team','away_team']] = fixtures['name'].str.split(' vs ', expand=True)
+    fixtures['opponent'] = fixtures.apply(lambda x: x['away_team'] if x['home_team'] == team_name else x['home_team'], axis=1)
+    #fixtures = fixtures[fixtures['stats_imported'] == 1].reset_index(drop=True)
+    if comp_id is not None:
+        try:
+            fixtures = fixtures[fixtures['competition_id'].isin(comp_id)].reset_index(drop=True)
+        except:
+            fixtures = fixtures[fixtures['competition_id'] == comp_id].reset_index(drop=True)
+    if season_id is not None:
+        fixtures = fixtures[fixtures['season_id'] == season_id].reset_index(drop=True)
+    fixtures = fixtures[['id','competition_id','round_id','season_id','kickoff_datetime','opponent','home_team','away_team','home_team_id','away_team_id','home_team_goals','away_team_goals']]
+    return fixtures.sort_values(by='kickoff_datetime').reset_index(drop=True)
+
+def get_team_stats(stat, team, venue='Yes', comp_id=None, season_id=None, games=None):
+    import pandas as pd
+    team_stats = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixture_team_stats.csv")
+    team_stats.drop_duplicates(subset=['fixture_id','stats_type_id','team_id'], inplace=True)
+    fixtures = get_team_fixtures(team, comp_id, season_id)
+    if stat == 'Fouls Drawn':
+        team_stats = team_stats[team_stats['fixture_id'].isin((fixtures).id.unique()) & 
+                            (team_stats['stats_type_id'] == get_stat_id('Fouls')) & 
+                            (team_stats['team_id'] != get_team_id(team))].reset_index(drop=True)
+    else:
+        team_stats = team_stats[team_stats['fixture_id'].isin((fixtures).id.unique()) & 
+                                (team_stats['stats_type_id'] == get_stat_id(stat)) & 
+                                (team_stats['team_id'] == get_team_id(team))].reset_index(drop=True)
+    team_stats = team_stats[['fixture_id','value','team_id']]
+    team_stats = team_stats.merge(fixtures, left_on='fixture_id', right_on='id', how='left')
+    if venue == 'Yes':
+        venue = []
+        for index, row in team_stats.iterrows():
+            if row['team_id'] == row['home_team_id']:
+                venue.append('H')
+            else:
+                venue.append('A')
+        team_stats['venue'] = venue
+        team_stats = team_stats[['kickoff_datetime','season_id','opponent','value','venue']]
+    else:
+        team_stats = team_stats[['kickoff_datetime','season_id','opponent','value']]
+    team_stats.rename(columns={'value': f'Team {stat}'}, inplace=True)
+    team_stats = team_stats.sort_values(by='kickoff_datetime').reset_index(drop=True)
+    if games is not None:
+        team_stats = team_stats.iloc[-games:]
+    return team_stats.reset_index(drop=True)
+
+def get_opp_stats(stat, team, venue='Yes', comp_id=None, season_id=None, games=None):
+    import pandas as pd
+    team_stats = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixture_team_stats.csv")
+    team_stats.drop_duplicates(subset=['fixture_id','stats_type_id','team_id'], inplace=True)
+    fixtures = get_team_fixtures(team, comp_id, season_id)
+    if stat == 'Fouls Drawn':
+        team_stats = team_stats[team_stats['fixture_id'].isin((fixtures).id.unique()) & 
+                            (team_stats['stats_type_id'] == get_stat_id('Fouls')) & 
+                            (team_stats['team_id'] == get_team_id(team))].reset_index(drop=True)
+    else:
+        team_stats = team_stats[team_stats['fixture_id'].isin((fixtures).id.unique()) & 
+                                (team_stats['stats_type_id'] == get_stat_id(stat)) & 
+                                (team_stats['team_id'] != get_team_id(team))].reset_index(drop=True)
+    team_stats = team_stats[['fixture_id','value','team_id']]
+    team_stats = team_stats.merge(fixtures, left_on='fixture_id', right_on='id', how='left')
+    if venue == 'Yes':
+            venue = []
+            for index, row in team_stats.iterrows():
+                if row['team_id'] == row['home_team_id']:
+                    venue.append('A')
+                else:
+                    venue.append('H')
+            team_stats['venue'] = venue
+            team_stats = team_stats[['kickoff_datetime','season_id','opponent','value','venue']]
+    else:
+        team_stats = team_stats[['kickoff_datetime','season_id','opponent','value']]
+    team_stats.rename(columns={'value': f'Team {stat}'}, inplace=True)
+    team_stats = team_stats.sort_values(by='kickoff_datetime').reset_index(drop=True)
+    if games is not None:
+        team_stats = team_stats.iloc[-games:]
+    return team_stats.reset_index(drop=True)
+
+def get_weighted_opp_stats(stat, team, weight, venue='Yes', comp_id = None, season_id=None, games=None):
+    import pandas as pd
+    date_from = pd.to_datetime('today')
+    team_stats = get_opp_stats(stat, team, venue, comp_id, season_id, games)
+    team_stats = team_stats[pd.to_datetime(team_stats['kickoff_datetime']) < date_from].reset_index(drop=True)
+    team_stats['Weeks Since Kickoff'] = (date_from - pd.to_datetime(team_stats['kickoff_datetime'])).dt.days // 7
+    team_stats['Weight'] = weight ** (team_stats['Weeks Since Kickoff'])
+    team_stats['Weighted'+ stat] = team_stats['Team ' + stat] * team_stats['Weight']
+    return team_stats
+
+def get_weighted_team_stats(stat, team, weight, venue='Yes', comp_id = None, season_id=None, games=None):
+    import pandas as pd
+    date_from = pd.to_datetime('today')
+    team_stats = get_team_stats(stat, team, venue, comp_id, season_id, games)
+    team_stats = team_stats[pd.to_datetime(team_stats['kickoff_datetime']) < date_from].reset_index(drop=True)
+    team_stats['Weeks Since Kickoff'] = (date_from - pd.to_datetime(team_stats['kickoff_datetime'])).dt.days // 7
+    team_stats['Weight'] = weight ** (team_stats['Weeks Since Kickoff'])
+    team_stats['Weighted '+ stat] = team_stats['Team ' + stat] * team_stats['Weight']
+    return team_stats
+
+def get_team_weighted_average(stat, team, weight, venue='Yes', comp_id = None, season_id=None, games=None):
+    team_stats = get_weighted_team_stats(stat, team, weight, venue, comp_id, season_id, games)
+    return team_stats['Weighted '+ stat].sum() / team_stats['Weight'].sum()
+
+def get_opp_weighted_average(stat, team, weight, venue='Yes', comp_id = None, season_id=None, games=None):
+    team_stats = get_weighted_opp_stats(stat, team, weight, venue, comp_id, season_id, games)
+    return team_stats['Weighted'+ stat].sum() / team_stats['Weight'].sum()
+
+def load_model(stat):
+    import pickle
+    filename = "C:\\Users\\George\\Documents\\Statz.ai\\Notebooks\\PL Projections\\Model Builds\\" + stat + '_model.sav'
+    model = pickle.load(open(filename, 'rb'))
+    return model
+
+def load_all_models(stat_list):
+    models = {}
+    for stat in stat_list:
+        model = load_model(stat)
+        models[stat] = model
+    return models
+
+def get_team_stat_prediction(team, opponent, stat, model, venue=None, comp_id=None, games=None):
+    if venue == None:
+        team_history = get_team_weighted_average(stat, team, 0.96,comp_id=comp_id,games=games)
+        opponent_history = get_opp_weighted_average(stat, opponent, 0.96,comp_id=comp_id,games=games)
+    else:
+        team_history = get_team_weighted_average(stat, team, 0.96,comp_id=comp_id,games=games) * calculate_team_venue_effect(team, stat, venue,comp_id=comp_id,games=games*2)
+        if venue == 'H':
+            opponent_venue = 'A'
+        else:
+            opponent_venue = 'H'    
+        opponent_history = get_opp_weighted_average(stat, opponent, 0.96,comp_id=comp_id,games=games) * calculate_opp_venue_effect(team, stat, opponent_venue,comp_id=comp_id,games=games*2) 
+    team_stat = model.predict([[team_history, opponent_history]])
+    return (team_stat[0]).round(2) 
