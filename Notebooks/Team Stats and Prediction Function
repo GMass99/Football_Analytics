@@ -127,6 +127,26 @@ def load_all_models(stat_list):
         models[stat] = model
     return models
 
+def calculate_team_venue_effect(team, stat, venue, comp_id=None, games=None):
+    team_stats = get_team_stats(stat, team,'Yes', comp_id=comp_id, games=games)
+    home = team_stats[team_stats['venue'] == 'H'][f'Team {stat}'].mean()
+    away = team_stats[team_stats['venue'] == 'A'][f'Team {stat}'].mean()
+    avg = team_stats[f'Team {stat}'].mean()
+    if venue == 'H':
+        return home/avg
+    else:
+        return away/avg
+    
+def calculate_opp_venue_effect(team, stat, venue, comp_id=None, games=None):
+    team_stats = get_opp_stats(stat, team,'Yes', comp_id=comp_id, games=games)
+    home = team_stats[team_stats['venue'] == 'H'][f'Team {stat}'].mean()
+    away = team_stats[team_stats['venue'] == 'A'][f'Team {stat}'].mean()
+    avg = team_stats[f'Team {stat}'].mean()
+    if venue == 'H':
+        return home/avg
+    else:
+        return away/avg
+
 def get_team_stat_prediction(team, opponent, stat, model, venue=None, comp_id=None, games=None):
     if venue == None:
         team_history = get_team_weighted_average(stat, team, 0.96,comp_id=comp_id,games=games)
