@@ -1,0 +1,76 @@
+def plot_table_position_probs(df, cmap, min_val, max_val):
+    fig = plt.figure(figsize=(12, 6), dpi=200, facecolor='#F9F8F5')
+    gs = fig.add_gridspec(1, 23)
+
+    # Create axes for team names, positions, badges, and the heatmap
+    ax_teams = fig.add_subplot(gs[0, 0:3])
+    ax_pos = fig.add_subplot(gs[0, 4])
+    ax_badges = fig.add_subplot(gs[0,3])
+    ax_heatmap = fig.add_subplot(gs[0, 5:])
+
+    # Plot team names, positions, and badges (you'll need to customize this part)
+    from matplotlib import image as mpimg
+    import matplotlib.colors as mcolors
+
+    ax_teams.table(cellText=df['Team'].values.reshape(-1, 1), loc='center', cellLoc='right', fontsize=24,bbox=[0, 0, 1, 1], edges='open')
+    pos_table = ax_pos.table(cellText=df['POS'].values.reshape(-1, 1), loc='center', cellLoc='center',bbox=[0, 0, 1, 1], edges='open')#, cellColours='grey')
+    for i, team in df.iterrows():
+        img = mpimg.imread(team['Badge'])
+        ax_badges.imshow(img, extent=[0.25, 0.75, i+0.1, i+0.9], aspect='auto', origin='lower')
+    for key, cell in pos_table.get_celld().items():
+        cell.get_text().set_color('grey')
+    ax_badges.set_ylim(len(df), 0)
+    ax_badges.set_xlim(0, 1)
+    ax_badges.axis('off')
+    min_val = 0.001
+    my_cmap = copy(cmap)
+    my_cmap = mcolors.LinearSegmentedColormap.from_list('trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=0.1, b=1),
+                                                        cmap(np.linspace(0.1, 1, 100)))
+    ax_heatmap.set_facecolor('#F9F8F5')
+    my_cmap.set_over("#F9F8F5")
+    my_cmap.set_under("#F9F8F5")
+    sns.heatmap(df.iloc[:, 3:], ax=ax_heatmap, cmap=my_cmap, annot=True, fmt='.1f', cbar=False, linewidths=2, linecolor='#F9F8F5', vmin=min_val, vmax=max_val)
+    ax_heatmap.xaxis.tick_top() 
+    for t in ax_heatmap.texts: # rotate x ticks
+        t.set_weight('bold')
+        t.set_fontsize(8)
+        if float(t.get_text())>=1:
+            t.set_text(t.get_text()) #if the value is greater than 0.4 then I set the text 
+        else:
+            t.set_text("")
+    # Customize the appearance
+    ax_heatmap.set_yticklabels([])
+    #ax_heatmap.set_xlabel('Predicted Final League Position')
+    plt.text(-0.25, 1.13, 'Predicted Final League Position', color='black', fontsize=16, weight='bold', ha='left', va='center', transform=plt.gca().transAxes)
+    plt.text(-0.25, 1.08, 'Premier League 24/25 Season', color='black', fontsize=8, ha='left', va='center', transform=plt.gca().transAxes)
+    plt.text(1, -0.05, 'Percentage probabilities of finishing in each position is shown. Only probabilities of at least 1% are labelled', color='black', fontsize=8, ha='right', va='center', transform=plt.gca().transAxes)
+    # Add spines back to the heatmap
+    ax_heatmap.spines['top'].set_visible(True)
+    ax_heatmap.spines['top'].set_color('grey')
+    ax_heatmap.spines['top'].set_linewidth(2)
+    ax_heatmap.spines['left'].set_visible(True)
+    ax_heatmap.spines['left'].set_color('grey')
+    ax_heatmap.spines['left'].set_linewidth(2)
+    ax_heatmap.tick_params(axis='both', which='both', length=0)
+    for label in ax_heatmap.get_xticklabels():
+        label.set_fontweight('bold')# Remove axes for team names, positions, and badges
+    for ax in [ax_teams, ax_pos, ax_badges]:
+        ax.axis('off')
+
+    ax_pos.set_title('POS', fontsize=12, weight='bold', color='black', loc='center', pad=5)
+
+    logo_image = plt.imread("C:\\Users\\George\\Documents\\Football Analytics\\Images\\Premier League_Logo.png")
+
+    # Create an OffsetImage instance with the loaded image
+    logo_offsetimage = OffsetImage(logo_image, zoom=0.11)  # Adjust the zoom value as needed
+
+        # Create an AnnotationBbox instance and add it to the plot
+    logo_box = AnnotationBbox(logo_offsetimage, (0.98, 1.16), xycoords='axes fraction', box_alignment=(1.0, 1.0), boxcoords="offset pixels")
+    ax = plt.gca()
+    ax.add_artist(logo_box)
+
+        # Make the box invisible, but keep the image visible
+    logo_box.patch.set_alpha(0)
+    plt.tight_layout()
+    plt.savefig(r"C:\Users\George\Documents\University\Masters\DISS\Predicted 24-25 Table Probabilities.png", dpi=300, bbox_inches='tight')
+    plt.show()
