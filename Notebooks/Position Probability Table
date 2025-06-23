@@ -1,0 +1,29 @@
+def get_table_position_probs(team_positions, num_iterations):
+    pos_prob_df = pd.DataFrame.from_dict(team_positions)
+    pos_prob_df = (pos_prob_df / num_iterations * 100).round(2)
+    pos_prob_df.sort_index(inplace=True)
+    pos_prob_df = pos_prob_df.T
+    pos_prob_df.sort_values(by=1, ascending=False, inplace=True)
+    pos_prob_df.fillna(0, inplace=True)
+    pos_prob_df.index.name = 'Team'
+    cum_pos_prob_df = pos_prob_df.copy()
+    for x in cum_pos_prob_df.index:
+        cum_pos_prob_df.loc[x] = cum_pos_prob_df.loc[x].cumsum()
+    prob_pos_dict = {}
+    for pos in cum_pos_prob_df.columns:
+        prob_pos_dict[pos] = cum_pos_prob_df[pos].idxmax()
+        cum_pos_prob_df.drop(prob_pos_dict[pos], inplace=True)
+    pred_pos_df = pd.DataFrame(prob_pos_dict, index=[0])
+    pred_pos_df = pred_pos_df.T
+    pred_pos_df.rename(columns={0: 'Team'}, inplace=True)
+    table_pred = pd.merge(pred_pos_df, pos_prob_df, on='Team')
+    table_pred = table_pred.reset_index(drop=True)
+    table_pred['POS'] = range(1,21)
+    position = table_pred['POS']
+    table_pred.drop(columns=['POS'], inplace=True)
+    table_pred.insert(0, 'POS', position)
+    table_pred['Badge'] = table_pred['Team'].apply(lambda x: f"C:/Users/George/Documents/Football Analytics/Team Logos/{x.lower()}_logo.png")
+    table_pred = table_pred[['Team', 'Badge', 'POS', 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]]
+    #table_pred.set_index(['Team','Position'], inplace=True)
+    #table_pred.set_index('Team',inplace=True)
+    return table_pred
