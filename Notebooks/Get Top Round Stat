@@ -1,0 +1,46 @@
+import pandas as pd
+import numpy as np
+from StatzFunctions import *
+
+league = 'Championship'
+
+player_stats = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixture_player_stats.csv")
+team_stats = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixture_team_stats.csv")
+standings = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\standings.csv")
+league_id = get_league_id(league)
+fixtures = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\fixtures.csv")
+fixtures = fixtures[fixtures['competition_id'] == league_id]
+players = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\players.csv")
+teams = pd.read_csv(r"C:\Users\George\Documents\Statz.ai\Data\teams.csv")
+todays_date = pd.Timestamp.now()
+fixtures['kickoff_datetime'] = pd.to_datetime(fixtures['kickoff_datetime'])
+fixtures = fixtures[fixtures['kickoff_datetime'] < todays_date]
+fixtures.sort_values(by='kickoff_datetime', ascending=False, inplace=True)
+previous_round_id = fixtures.head(1)['round_id'].values[0]
+prev_fix_ids = fixtures[fixtures['round_id'] == previous_round_id]['id'].tolist()
+prev_fix_stats = stats[stats['fixture_id'].isin(prev_fix_ids)]
+prev_fix_stats.drop_duplicates(subset=['fixture_id', 'player_id', 'stats_type_id'], inplace=True)
+
+def get_top_stat_round(prev_fix_stats, stat, players, teams, stats_types):
+    stat_id = stats_types[stats_types['name'] == stat]['id'].values[0]
+    prev_fix_stats = prev_fix_stats[prev_fix_stats['stats_type_id'] == stat_id]
+    if prev_fix_stats.empty:
+        return []
+    prev_fix_stats = prev_fix_stats.copy()
+    prev_fix_stats.sort_values(by=['value'], ascending=False, inplace=True)
+    results = []
+    for _, row in prev_fix_stats.iterrows():
+        if len(results) == 10:
+            break
+        try:
+            player_id = row['player_id']
+            player_name = players[players['id'] == player_id]['display_name'].values[0]
+            team_id = row['team_id']
+            team_name = teams[teams['id'] == team_id]['name'].values[0]
+            stat_value = row['value']
+            results.append((player_name, team_name, stat_value))
+        except:
+            pass
+    return pd.DataFrame(results, columns=['Player', 'Team', stat])
+
+get_top_stat_round(prev_fix_stats, 'Shots Total', players, teams, stats_types)
